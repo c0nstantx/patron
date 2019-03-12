@@ -120,19 +120,46 @@ Adding to the above list is as easy as implementing a `Component` and a `Process
 Setting up a new service with a HTTP `Component` is as easy as the following code:
 
 ```go
+package main
+
+import (
+  "fmt"
+  "os"
+
+  "github.com/thebeatapp/patron"
+  "github.com/thebeatapp/patron/log"
+  sync_http "github.com/thebeatapp/patron/sync/http"
+)
+
+var (
+  version = "dev"
+)
+
+func main() {
+  name := "test"
+
+  err := patron.Setup(name, version)
+  if err != nil {
+    fmt.Printf("failed to set up logging: %v", err)
+    os.Exit(1)
+  }
+
   // Set up HTTP routes
   routes := make([]sync_http.Route, 0)
-  routes = append(routes, sync_http.NewRoute("/", http.MethodGet, processor, true))
-  
-  srv, err := patron.New("test", patron.Routes(routes))
+  // Append a GET route
+  routes = append(routes, sync_http.NewRoute("/get", http.MethodGet, func(ctx context.Context, req *sync.Request) (*sync.Response, error) {
+    return sync.NewResponse("Get data"), nil
+  }, true, nil))
+  srv, err := patron.New(name, version, patron.Routes(routes))
   if err != nil {
     log.Fatalf("failed to create service %v", err)
   }
 
   err = srv.Run()
   if err != nil {
-    log.Fatalf("failed to create service %v", err)
+    log.Fatalf("failed to run service %v", err)
   }
+}
 ```
 
 The above is pretty much self-explanatory. The processor follows the sync pattern.
