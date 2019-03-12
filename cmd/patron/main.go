@@ -201,7 +201,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv, err := patron.New(name, version)
+	routes := make([]sync_http.Route, 0)
+
+	// Example routes. Uncomment to use
+
+	// Get route with tracing and no authentication
+	// routes = append(routes, sync_http.NewRoute("/get", http.MethodGet, func(ctx context.Context, req *sync.Request) (*sync.Response, error) {
+	// 	return sync.NewResponse("Get data"), nil
+	// }, true, nil))
+
+	// Post route with tracing and failed authentication
+	// routes = append(routes, sync_http.NewRoute("/post", http.MethodPost, func(ctx context.Context, req *sync.Request) (*sync.Response, error) {
+	// 	return sync.NewResponse("Success"), nil
+	// }, true, demoAuthenticator{Authenticated: false}))
+
+	// Put route without tracing and failed authentication
+	// routes = append(routes, sync_http.NewRoute("/put_unauthenticated", http.MethodPut, func(ctx context.Context, req *sync.Request) (*sync.Response, error) {
+	// 	return sync.NewResponse("Success"), nil
+	// }, false, demoAuthenticator{Authenticated: false}))
+
+	// Put route without tracing and successfull authentication using helper method NewAuthPutRoute
+	// routes = append(routes, sync_http.NewAuthPutRoute("/put_authenticated", func(ctx context.Context, req *sync.Request) (*sync.Response, error) {
+	// 	return sync.NewResponse("Success"), nil
+	// }, false, demoAuthenticator{Authenticated: true}))
+
+	srv, err := patron.New(name, version, patron.Routes(routes))
 	if err != nil {
 		log.Fatalf("failed to create service %v", err)
 	}
@@ -211,6 +235,16 @@ func main() {
 		log.Fatalf("failed to run service %v", err)
 	}
 }
+
+// Uncomment for use on route examples with authenticator
+// type demoAuthenticator struct {
+// 	Authenticated bool
+// }
+
+// func (a demoAuthenticator) Authenticate(req *http.Request) (bool, error) {
+// 	return a.Authenticated, nil
+// }
+
 `
 	return []byte(strings.Replace(cnt, nameTemplate, name, -1))
 }
