@@ -8,12 +8,12 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/thebeatapp/patron/errors"
-	"github.com/thebeatapp/patron/info"
-	"github.com/thebeatapp/patron/log"
-	"github.com/thebeatapp/patron/log/zerolog"
-	"github.com/thebeatapp/patron/sync/http"
-	"github.com/thebeatapp/patron/trace"
+	"github.com/beatlabs/patron/errors"
+	"github.com/beatlabs/patron/info"
+	"github.com/beatlabs/patron/log"
+	"github.com/beatlabs/patron/log/zerolog"
+	"github.com/beatlabs/patron/sync/http"
+	"github.com/beatlabs/patron/trace"
 	jaeger "github.com/uber/jaeger-client-go"
 )
 
@@ -30,6 +30,7 @@ type Component interface {
 type Service struct {
 	cps           []Component
 	routes        []http.Route
+	middlewares   []http.MiddlewareFunc
 	hcf           http.HealthCheckFunc
 	termSig       chan os.Signal
 	sighupHandler func()
@@ -37,7 +38,6 @@ type Service struct {
 
 // New creates a new named service and allows for customization through functional options.
 func New(name, version string, oo ...OptionFunc) (*Service, error) {
-
 	if name == "" {
 		return nil, errors.New("name is required")
 	}
@@ -53,6 +53,7 @@ func New(name, version string, oo ...OptionFunc) (*Service, error) {
 		hcf:           http.DefaultHealthCheck,
 		termSig:       make(chan os.Signal, 1),
 		sighupHandler: func() { log.Info("SIGHUP received: nothing setup") },
+		middlewares:   []http.MiddlewareFunc{},
 	}
 
 	err := Setup(name, version)
@@ -205,6 +206,10 @@ func (s *Service) createHTTPComponent() (Component, error) {
 
 	if s.routes != nil {
 		options = append(options, http.Routes(s.routes))
+	}
+
+	if s.middlewares != nil && len(s.middlewares) > 0 {
+		options = append(options, http.Middlewares(s.middlewares...))
 	}
 
 	cp, err := http.New(options...)

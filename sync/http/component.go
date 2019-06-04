@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/beatlabs/patron/log"
 	"github.com/julienschmidt/httprouter"
-	"github.com/thebeatapp/patron/log"
 )
 
 const (
@@ -31,9 +31,10 @@ type Component struct {
 	httpWriteTimeout time.Duration
 	info             map[string]interface{}
 	sync.Mutex
-	routes   []Route
-	certFile string
-	keyFile  string
+	routes      []Route
+	middlewares []MiddlewareFunc
+	certFile    string
+	keyFile     string
 }
 
 // New returns a new component.
@@ -44,6 +45,7 @@ func New(oo ...OptionFunc) (*Component, error) {
 		httpReadTimeout:  httpReadTimeout,
 		httpWriteTimeout: httpWriteTimeout,
 		routes:           []Route{},
+		middlewares:      []MiddlewareFunc{},
 		info:             make(map[string]interface{}),
 	}
 
@@ -72,9 +74,6 @@ func (c *Component) Info() map[string]interface{} {
 func (c *Component) Run(ctx context.Context) error {
 	c.Lock()
 	log.Debug("applying tracing to routes")
-	for i := 0; i < len(c.routes); i++ {
-		c.routes[i].Handler = Middleware(c.routes[i].Trace, c.routes[i].Auth, c.routes[i].Pattern, c.routes[i].Handler)
-	}
 	chFail := make(chan error)
 	srv := c.createHTTPServer()
 	go c.listenAndServe(srv, chFail)
@@ -103,15 +102,25 @@ func (c *Component) createHTTPServer() *http.Server {
 	log.Debugf("adding %d routes", len(c.routes))
 	router := httprouter.New()
 	for _, route := range c.routes {
-		router.HandlerFunc(route.Method, route.Pattern, route.Handler)
+		if len(route.Middlewares) > 0 {
+			h := MiddlewareChain(route.Handler, route.Middlewares...)
+			router.Handler(route.Method, route.Pattern, h)
+		} else {
+			router.HandlerFunc(route.Method, route.Pattern, route.Handler)
+		}
+
 		log.Debugf("added route %s %s", route.Method, route.Pattern)
 	}
+	// Add first the recovery middleware to ensure that no panic occur.
+	routerAfterMiddleware := MiddlewareChain(router, NewRecoveryMiddleware())
+	routerAfterMiddleware = MiddlewareChain(routerAfterMiddleware, c.middlewares...)
+
 	return &http.Server{
 		Addr:         fmt.Sprintf(":%d", c.httpPort),
 		ReadTimeout:  c.httpReadTimeout,
 		WriteTimeout: c.httpWriteTimeout,
 		IdleTimeout:  httpIdleTimeout,
-		Handler:      router,
+		Handler:      routerAfterMiddleware,
 	}
 }
 

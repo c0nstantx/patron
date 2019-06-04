@@ -8,14 +8,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/beatlabs/patron"
+	"github.com/beatlabs/patron/encoding/protobuf"
+	"github.com/beatlabs/patron/examples"
+	"github.com/beatlabs/patron/log"
+	"github.com/beatlabs/patron/sync"
+	patronhttp "github.com/beatlabs/patron/sync/http"
+	tracehttp "github.com/beatlabs/patron/trace/http"
 	"github.com/pkg/errors"
-	"github.com/thebeatapp/patron"
-	"github.com/thebeatapp/patron/encoding/protobuf"
-	"github.com/thebeatapp/patron/examples"
-	"github.com/thebeatapp/patron/log"
-	"github.com/thebeatapp/patron/sync"
-	patronhttp "github.com/thebeatapp/patron/sync/http"
-	tracehttp "github.com/thebeatapp/patron/trace/http"
 )
 
 func init() {
@@ -46,6 +46,16 @@ func main() {
 		patronhttp.NewPostRoute("/", first, true),
 	}
 
+	// Setup a simple CORS middleware
+	middlewareCors := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Access-Control-Allow-Origin", "*")
+			w.Header().Add("Access-Control-Allow-Methods", "GET, POST")
+			w.Header().Add("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
+			w.Header().Add("Access-Control-Allow-Credentials", "Allow")
+			h.ServeHTTP(w, r)
+		})
+	}
 	sig := patron.SIGHUP(func() {
 		fmt.Println("exit gracefully...")
 		os.Exit(0)
@@ -55,6 +65,7 @@ func main() {
 		name,
 		version,
 		patron.Routes(routes),
+		patron.Middlewares(middlewareCors),
 		sig,
 	)
 	if err != nil {

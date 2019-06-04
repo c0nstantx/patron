@@ -1,10 +1,10 @@
 package patron
 
 import (
-	"github.com/thebeatapp/patron/errors"
-	"github.com/thebeatapp/patron/info"
-	"github.com/thebeatapp/patron/log"
-	"github.com/thebeatapp/patron/sync/http"
+	"github.com/beatlabs/patron/errors"
+	"github.com/beatlabs/patron/info"
+	"github.com/beatlabs/patron/log"
+	"github.com/beatlabs/patron/sync/http"
 )
 
 // OptionFunc definition for configuring the service in a functional way.
@@ -18,6 +18,18 @@ func Routes(rr []http.Route) OptionFunc {
 		}
 		s.routes = rr
 		log.Info("routes options are set")
+		return nil
+	}
+}
+
+// Middlewares option for adding generic middlewares to the default HTTP component.
+func Middlewares(mm ...http.MiddlewareFunc) OptionFunc {
+	return func(s *Service) error {
+		if len(mm) == 0 {
+			return errors.New("middlewares are required")
+		}
+		s.middlewares = mm
+		log.Info("middleware options are set")
 		return nil
 	}
 }

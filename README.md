@@ -1,10 +1,10 @@
-# patron [![CircleCI](https://circleci.com/gh/thebeatapp/patron.svg?style=svg)](https://circleci.com/gh/thebeatapp/patron) [![codecov](https://codecov.io/gh/thebeatapp/patron/branch/master/graph/badge.svg)](https://codecov.io/gh/thebeatapp/patron) [![Go Report Card](https://goreportcard.com/badge/github.com/thebeatapp/patron)](https://goreportcard.com/report/github.com/thebeatapp/patron) [![GoDoc](https://godoc.org/github.com/thebeatapp/patron?status.svg)](https://godoc.org/github.com/thebeatapp/patron) ![GitHub release](https://img.shields.io/github/release/thebeatapp/patron.svg)
+# patron [![CircleCI](https://circleci.com/gh/beatlabs/patron.svg?style=svg)](https://circleci.com/gh/beatlabs/patron) [![codecov](https://codecov.io/gh/beatlabs/patron/branch/master/graph/badge.svg)](https://codecov.io/gh/beatlabs/patron) [![Go Report Card](https://goreportcard.com/badge/github.com/beatlabs/patron)](https://goreportcard.com/report/github.com/beatlabs/patron) [![GoDoc](https://godoc.org/github.com/beatlabs/patron?status.svg)](https://godoc.org/github.com/beatlabs/patron) ![GitHub release](https://img.shields.io/github/release/beatlabs/patron.svg)
 
 Patron is a framework for creating microservices, originally created by Sotiris Mantzaris (https://github.com/mantzas). This fork is maintained by Beat Engineering (https://thebeat.co)
 
 `Patron` is french for `template` or `pattern`, but it means also `boss` which we found out later (no pun intended).
 
-The entry point of the framework is the `Service`. The `Service` uses `Components` to handle the processing of sync and async requests. The `Service` starts by default a `HTTP Component` which hosts the debug, health and metric endpoints. Any other endpoints will be added to the default `HTTP Component` as `Routes`. The service set's up by default logging with `zerolog`, tracing and metrics with `jaeger` and `prometheus`.
+The entry point of the framework is the `Service`. The `Service` uses `Components` to handle the processing of sync and async requests. The `Service` starts by default a `HTTP Component` which hosts the debug, health and metric endpoints. Any other endpoints will be added to the default `HTTP Component` as `Routes`. Alongside `Routes` one can specify middleware functions to be applied ordered to all routes as `MiddlewareFunc`. The service set's up by default logging with `zerolog`, tracing and metrics with `jaeger` and `prometheus`.
 
 `Patron` provides abstractions for the following functionality of the framework:
 
@@ -59,13 +59,13 @@ The framework supplies a cli in order to simplify repository generation with the
 The latest version can be installed with
 
 ```go
-go get github.com/thebeatapp/patron/cmd/patron
+go get github.com/beatlabs/patron/cmd/patron
 ```
 
-The below is an example of a service created with the cli that has a module name `github.com/thebeatapp/test` and will be created in the test folder in the current directory.
+The below is an example of a service created with the cli that has a module name `github.com/beatlabs/test` and will be created in the test folder in the current directory.
 
 ```go
-patron -m "github.com/thebeatapp/test" -p "test"
+patron -m "github.com/beatlabs/test" -p "test"
 ```
 
 ## Service
@@ -116,11 +116,29 @@ The following component implementations are available:
 
 Adding to the above list is as easy as implementing a `Component` and a `Processor` for that component.
 
+### Middleware
+
+A `MiddlewareFunc` preserves the default net/http middleware pattern.
+You can create new middleware functions and pass them to Service to be chained on all routes in the default Http Component.
+
+```go
+type MiddlewareFunc func(next http.Handler) http.Handler
+
+// Setup a simple middleware for CORS
+newMiddleware := func(h http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Add("Access-Control-Allow-Origin", "*")
+        // Next
+        h.ServeHTTP(w, r)
+    })
+}
+```
+
 ## Examples
 
 Detailed examples can be found in the [examples](/examples) folder with the following components involved:
 
-- [HTTP Component, HTTP Tracing](/examples/first/main.go)
+- [HTTP Component, HTTP Tracing, HTTP middleware](/examples/first/main.go)
 - [Kafka Component, HTTP Component, HTTP Authentication, Kafka Tracing](/examples/second/main.go)
 - [Kafka Component, AMQP Tracing](/examples/third/main.go)
 - [AMQP Component](/examples/fourth/main.go)
@@ -153,6 +171,18 @@ Decode(v interface{}) error
 The `Response` model contains the following properties (which are provided when calling the "constructor" `NewResponse`)
 
 - Payload, which may hold a struct of type `interface{}`
+
+### Middlewares per Route
+
+Middlewares can also run per routes using the processor as Handler.
+So using the `Route` helpers:
+
+```go
+// A route with ...MiddlewareFunc that will run for this route only + tracing
+route := NewRoute("/index", "GET" ProcessorFunc, true, ...MiddlewareFunc)
+// A route with ...MiddlewareFunc that will run for this route only + auth + tracing
+routeWithAuth := NewAuthRoute("/index", "GET" ProcessorFunc, true, Authendicator, ...MiddlewareFunc)
+```
 
 ### Asynchronous
 

@@ -3,7 +3,7 @@ package http
 import (
 	"time"
 
-	"github.com/thebeatapp/patron/errors"
+	"github.com/beatlabs/patron/errors"
 )
 
 // OptionFunc defines a option func for the HTTP component.
@@ -36,6 +36,17 @@ func Routes(rr []Route) OptionFunc {
 			return errors.New("routes are empty")
 		}
 		s.routes = append(s.routes, rr...)
+		return nil
+	}
+}
+
+// Middlewares option for setting the routes middlewares of the HTTP component.
+func Middlewares(mm ...MiddlewareFunc) OptionFunc {
+	return func(s *Component) error {
+		if len(mm) == 0 {
+			return errors.New("middlewares are empty")
+		}
+		s.middlewares = append(s.middlewares, mm...)
 		return nil
 	}
 }
