@@ -62,12 +62,6 @@ Start fifth service:
 go run examples/fifth/main.go
 ```
 
-Start sixth service:
-
-```shell
-go run examples/sixth/main.go
-```
-
 and the use curl to send a request:
 
 ```shell

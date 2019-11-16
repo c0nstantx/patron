@@ -52,31 +52,6 @@ func TestServer_Run_Shutdown(t *testing.T) {
 	tests := []struct {
 		name    string
 		cp      Component
-		wantErr bool
-	}{
-		{name: "success", cp: &testComponent{}, wantErr: false},
-		{name: "failed to run", cp: &testComponent{errorRunning: true}, wantErr: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := os.Setenv("PATRON_HTTP_DEFAULT_PORT", getRandomPort())
-			assert.NoError(t, err)
-			s, err := New("test", "", Components(tt.cp, tt.cp, tt.cp))
-			assert.NoError(t, err)
-			err = s.Run()
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestServer_RunWithContext_Shutdown(t *testing.T) {
-	tests := []struct {
-		name    string
-		cp      Component
 		ctx     context.Context
 		wantErr bool
 	}{
@@ -89,7 +64,7 @@ func TestServer_RunWithContext_Shutdown(t *testing.T) {
 			assert.NoError(t, err)
 			s, err := New("test", "", Components(tt.cp, tt.cp, tt.cp))
 			assert.NoError(t, err)
-			err = s.RunWithContext(tt.ctx)
+			err = s.Run(tt.ctx)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
