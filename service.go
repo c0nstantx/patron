@@ -89,13 +89,23 @@ func (s *Service) setupOSSignal() {
 // If a component returns a error the service is responsible for shutting down
 // all components and terminate itself.
 func (s *Service) Run() error {
+	return s.run(context.WithCancel(context.Background()))
+}
+
+// RunWithContext starts up all service components and monitors for errors using an existing parent context.
+// If a component returns a error the service is responsible for shutting down
+// all components and terminate itself.
+func (s *Service) RunWithContext(ctx context.Context) error {
+	return s.run(context.WithCancel(ctx))
+}
+
+func (s *Service) run(ctx context.Context, cnl context.CancelFunc) error {
 	defer func() {
 		err := trace.Close()
 		if err != nil {
 			log.Errorf("failed to close trace %v", err)
 		}
 	}()
-	ctx, cnl := context.WithCancel(context.Background())
 	chErr := make(chan error, len(s.cps))
 	wg := sync.WaitGroup{}
 	wg.Add(len(s.cps))
