@@ -48,7 +48,7 @@ func New(oo ...OptionFunc) (*TracedClient, error) {
 }
 
 // Do executes a HTTP request with integrated tracing and tracing propagation downstream.
-// It also uses HTTP caching if it's enabled
+// It also uses HTTP caching if it's enabled and skips tracing for these requests.
 func (tc *TracedClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
 	req = req.WithContext(ctx)
 	req, ht := nethttp.TraceRequest(opentracing.GlobalTracer(), req,
@@ -57,20 +57,21 @@ func (tc *TracedClient) Do(ctx context.Context, req *http.Request) (*http.Respon
 	defer ht.Finish()
 
 	req.Header.Set(correlation.HeaderID, correlation.IDFromContext(ctx))
-	rsp, err := tc.do(req)
+	rsp, err := tc.send(req)
+	if rsp.Header.Get(cache.XFromCache) != "1" {
+		if err != nil {
+			ext.Error.Set(ht.Span(), true)
+		} else {
+			ext.HTTPStatusCode.Set(ht.Span(), uint16(rsp.StatusCode))
+		}
 
-	if err != nil {
-		ext.Error.Set(ht.Span(), true)
-	} else {
-		ext.HTTPStatusCode.Set(ht.Span(), uint16(rsp.StatusCode))
+		ext.HTTPMethod.Set(ht.Span(), req.Method)
+		ext.HTTPUrl.Set(ht.Span(), req.URL.String())
 	}
-
-	ext.HTTPMethod.Set(ht.Span(), req.Method)
-	ext.HTTPUrl.Set(ht.Span(), req.URL.String())
 	return rsp, err
 }
 
-func (tc *TracedClient) do(req *http.Request) (*http.Response, error) {
+func (tc *TracedClient) send(req *http.Request) (*http.Response, error) {
 	if tc.c != nil {
 		rsp, ok := tc.c.Get(*req)
 		if !ok {
@@ -80,6 +81,10 @@ func (tc *TracedClient) do(req *http.Request) (*http.Response, error) {
 		}
 		return rsp, nil
 	}
+	return tc.do(req)
+}
+
+func (tc *TracedClient) do(req *http.Request) (*http.Response, error) {
 	if tc.cb == nil {
 		return tc.cl.Do(req)
 	}

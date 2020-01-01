@@ -3,7 +3,6 @@ package cache
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"sync"
@@ -31,32 +30,30 @@ func NewMemory(ttl int64) (*Memory, error) {
 // Get retrieves a value from cache if exists.
 func (m *Memory) Get(req http.Request) (*http.Response, bool) {
 	m.Lock()
-	defer m.Unlock()
-	if ce, ok := m.store[requestKey(req)]; ok {
-		if !isFresh(ce) {
-			m.Delete(req)
-			return nil, false
-		}
-		b := bytes.NewBuffer(ce.respBytes)
-		rsp, err := http.ReadResponse(bufio.NewReader(b), &req)
-		if err != nil {
-			err := errors.Wrapf(err, "Error reading cached response for request: %s %s", req.Method, req.URL.String())
-			log.Warn(err)
-			m.Unlock()
-			m.Delete(req)
-			m.Lock()
-			return nil, false
-		}
-		return rsp, true
+	ce, ok := m.store[requestKey(req)]
+	m.Unlock()
+	if !ok {
+		return nil, false
 	}
-	return nil, false
+	if !isFresh(ce) {
+		m.Delete(req)
+		return nil, false
+	}
+	b := bytes.NewBuffer(ce.respBytes)
+	rsp, err := http.ReadResponse(bufio.NewReader(b), &req)
+	if err != nil {
+		err := errors.Wrapf(err, "Error reading cached response for request: %s %s", req.Method, req.URL.String())
+		log.Warn(err)
+		m.Delete(req)
+		return nil, false
+	}
+	rsp.Header.Set(XFromCache, "1")
+	return rsp, true
 }
 
 // Set creates/updates a value in cache.
 func (m *Memory) Set(req http.Request, rsp *http.Response) {
-	m.Lock()
 	if isCacheable(req, *rsp) {
-		// respBytes, err := ioutil.ReadAll(rsp.Body)
 		respBytes, err := httputil.DumpResponse(rsp, true)
 		if err == nil {
 			respText := string(respBytes)
@@ -64,11 +61,11 @@ func (m *Memory) Set(req http.Request, rsp *http.Response) {
 				respBytes: []byte(respText),
 				expiresAt: time.Now().Unix() + m.ttl,
 			}
+			m.Lock()
 			m.store[requestKey(req)] = ce
-			rsp.Body = ioutil.NopCloser(bytes.NewReader(ce.respBytes))
+			m.Unlock()
 		}
 	}
-	m.Unlock()
 }
 
 // Delete removes a value from cache.
