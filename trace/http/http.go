@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/beatlabs/patron/trace/http/cache"
+
 	"github.com/beatlabs/patron/correlation"
 	"github.com/beatlabs/patron/reliability/circuitbreaker"
 	"github.com/beatlabs/patron/trace"
@@ -22,6 +24,7 @@ type Client interface {
 type TracedClient struct {
 	cl *http.Client
 	cb *circuitbreaker.CircuitBreaker
+	c  cache.Cache
 }
 
 // New creates a new HTTP client.
@@ -45,6 +48,7 @@ func New(oo ...OptionFunc) (*TracedClient, error) {
 }
 
 // Do executes a HTTP request with integrated tracing and tracing propagation downstream.
+// It also uses HTTP caching if it's enabled
 func (tc *TracedClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
 	req = req.WithContext(ctx)
 	req, ht := nethttp.TraceRequest(opentracing.GlobalTracer(), req,
@@ -53,8 +57,8 @@ func (tc *TracedClient) Do(ctx context.Context, req *http.Request) (*http.Respon
 	defer ht.Finish()
 
 	req.Header.Set(correlation.HeaderID, correlation.IDFromContext(ctx))
-
 	rsp, err := tc.do(req)
+
 	if err != nil {
 		ext.Error.Set(ht.Span(), true)
 	} else {
@@ -67,6 +71,15 @@ func (tc *TracedClient) Do(ctx context.Context, req *http.Request) (*http.Respon
 }
 
 func (tc *TracedClient) do(req *http.Request) (*http.Response, error) {
+	if tc.c != nil {
+		rsp, ok := tc.c.Get(*req)
+		if !ok {
+			rsp, err := tc.do(req)
+			tc.c.Set(*req, rsp)
+			return rsp, err
+		}
+		return rsp, nil
+	}
 	if tc.cb == nil {
 		return tc.cl.Do(req)
 	}

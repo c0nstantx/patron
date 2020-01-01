@@ -3,6 +3,8 @@ package http
 import (
 	"time"
 
+	"github.com/beatlabs/patron/trace/http/cache"
+
 	"github.com/beatlabs/patron/errors"
 	"github.com/beatlabs/patron/reliability/circuitbreaker"
 )
@@ -29,6 +31,18 @@ func CircuitBreaker(name string, set circuitbreaker.Setting) OptionFunc {
 			return errors.Wrap(err, "failed to set circuit breaker")
 		}
 		tc.cb = cb
+		return nil
+	}
+}
+
+// Cache option for setting HTTP caching layer
+func Cache(ttl int64) OptionFunc {
+	return func(tc *TracedClient) error {
+		cache, err := cache.NewMemory(ttl)
+		if err != nil {
+			return errors.Wrap(err, "failed to set HTTP caching layer")
+		}
+		tc.c = cache
 		return nil
 	}
 }
