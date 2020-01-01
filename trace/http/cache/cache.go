@@ -13,6 +13,7 @@ const XFromCache = "X-From-Cache"
 // Currently only successful GET and HEAD requests (200: OK) are cached.
 // TODO: Handle incomplete responses (206: Partial Content)
 // TODO: Handle authenticated requests
+// TODO: Request coalescing
 type Cache interface {
 	Get(req http.Request) (rsp *http.Response, ok bool)
 	Set(req http.Request, rsp *http.Response)
