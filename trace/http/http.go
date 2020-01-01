@@ -61,7 +61,7 @@ func (tc *TracedClient) Do(ctx context.Context, req *http.Request) (*http.Respon
 	if err != nil {
 		ext.Error.Set(ht.Span(), true)
 	} else {
-		if rsp.Header.Get(cache.XFromCache) != "1" {
+		if rsp.Header.Get(cache.XFromCache) == "1" {
 			return rsp, err
 		}
 		ext.HTTPStatusCode.Set(ht.Span(), uint16(rsp.StatusCode))
