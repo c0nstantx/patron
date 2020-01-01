@@ -58,16 +58,17 @@ func (tc *TracedClient) Do(ctx context.Context, req *http.Request) (*http.Respon
 
 	req.Header.Set(correlation.HeaderID, correlation.IDFromContext(ctx))
 	rsp, err := tc.send(req)
-	if rsp.Header.Get(cache.XFromCache) != "1" {
-		if err != nil {
-			ext.Error.Set(ht.Span(), true)
-		} else {
-			ext.HTTPStatusCode.Set(ht.Span(), uint16(rsp.StatusCode))
+	if err != nil {
+		ext.Error.Set(ht.Span(), true)
+	} else {
+		if rsp.Header.Get(cache.XFromCache) != "1" {
+			return rsp, err
 		}
-
-		ext.HTTPMethod.Set(ht.Span(), req.Method)
-		ext.HTTPUrl.Set(ht.Span(), req.URL.String())
+		ext.HTTPStatusCode.Set(ht.Span(), uint16(rsp.StatusCode))
 	}
+
+	ext.HTTPMethod.Set(ht.Span(), req.Method)
+	ext.HTTPUrl.Set(ht.Span(), req.URL.String())
 	return rsp, err
 }
 
